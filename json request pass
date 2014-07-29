@@ -1,0 +1,876 @@
+package com.choose.Account;
+
+import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.ksoap2.SoapEnvelope;
+import org.ksoap2.serialization.SoapObject;
+import org.ksoap2.serialization.SoapPrimitive;
+import org.ksoap2.serialization.SoapSerializationEnvelope;
+import org.ksoap2.transport.HttpTransportSE;
+import com.lazylist.ImageLoader;
+import com.main.choosepassmerchant.R;
+import com.main.choosepassmerchant.Url;
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.ProgressDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.provider.MediaStore.MediaColumns;
+import android.util.Base64;
+import android.util.Log;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.view.Window;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemSelectedListener;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.CompoundButton.OnCheckedChangeListener;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.SimpleAdapter;
+import android.widget.Spinner;
+import android.widget.Toast;
+
+public class AddEditPass extends Activity implements OnClickListener {
+
+	private final int SELECT_FILE = 1;
+	private final int REQUEST_CAMERA = 0;
+	public String encoded;
+	ImageView Profile_image;
+
+	Button iv_upload;
+	ImageLoader imageLoader;
+
+	private final String NAMESPACE = Url.namespace();
+	private final String URL = Url.urlCall();
+
+	private final String SOAP_ACTION_CHECK_SUBCR = Url.namespace()
+			+ Url.add_edit_passes_by_admin();
+	private final String METHOD_NAME_CHECK_SUBCR = Url
+			.add_edit_passes_by_admin();
+
+	private final String SOAP_ACTION_CHECK_SUBCR_CATEGORY = Url.namespace()
+			+ Url.get_all_category_list();
+	private final String METHOD_NAME_CHECK_SUBCR_CAREGORY = Url
+			.get_all_category_list();
+
+	CheckBox cb_promotional, cb_yearlyprice, cb_monthlyprice;
+	ImageView iv_save, iv_back;
+
+	String str_promotional, str_editpassresponse;
+
+	int flag_cb_promotional = 0;
+
+	Spinner spinner_activationlimit, spinner_categorylist;
+	LinearLayout ll_subscrition;
+
+	SharedPreferences sharepref;
+
+	String passcode, str_passid = "", str_title, str_offerighlight,
+			str_short_desc, str_long_desc, str_promotional_cb_check,
+			str_noofpasses_forsale, str_passimage = "", str_monthly_cbcheck,
+			str_yeartl_cbcheck, str_monthlyprice, str_yearlyprice,
+			str_activation_limit, str_limit_count, str_final_count_extra;
+
+	boolean cb_promotional_check, cb_monthly_check, cb_yearly_check;
+
+	ArrayList<HashMap<String, String>> arrallist_category;
+
+	EditText et_title, et_offerhighlight, et_shortdesc, et_longdesc,
+			et_no_of_passes, et_monthly_price, et_yearl_price, et_limit_count,
+			et_limit_final_count;
+
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		// TODO Auto-generated method stub
+
+		requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+		setContentView(R.layout.addeditnewpass);
+
+		sharepref = getSharedPreferences(Url.MyPREFERENCES,
+				Context.MODE_PRIVATE);
+
+		imageLoader = new ImageLoader(AddEditPass.this);
+
+		passcode = sharepref.getString(Url.PassKeyCode, "");
+
+		Profile_image = (ImageView) findViewById(R.id.addeditpass_image);
+		iv_upload = (Button) findViewById(R.id.addeditpass_upload);
+
+		et_title = (EditText) findViewById(R.id.addeditpass_title);
+		et_offerhighlight = (EditText) findViewById(R.id.addeditpass_offerhighlight);
+		et_shortdesc = (EditText) findViewById(R.id.addeditpass_shortdescription);
+		et_longdesc = (EditText) findViewById(R.id.addeditpass_description);
+		et_no_of_passes = (EditText) findViewById(R.id.addeditpass_no_of_pass);
+		// et_image = (EditText) findViewById(R.id.addeditpass_image);
+
+		iv_back = (ImageView) findViewById(R.id.addeditpass_backarrow);
+		iv_save = (ImageView) findViewById(R.id.addeditpass_save);
+
+		cb_promotional = (CheckBox) findViewById(R.id.addeditpass_cbpromotional);
+		cb_monthlyprice = (CheckBox) findViewById(R.id.addeditpass_cb_monthlyprice);
+		cb_yearlyprice = (CheckBox) findViewById(R.id.addeditpass_cb_yearlyprice);
+
+		et_monthly_price = (EditText) findViewById(R.id.addeditpass_monthlyprice);
+		et_yearl_price = (EditText) findViewById(R.id.addeditpass_yearlyprice);
+		et_limit_count = (EditText) findViewById(R.id.addeditpass_activationcount);
+		et_limit_final_count = (EditText) findViewById(R.id.addeditpass_countexpiry);
+
+		spinner_activationlimit = (Spinner) findViewById(R.id.addeditpass_spinner_activationlimit);
+		spinner_categorylist = (Spinner) findViewById(R.id.addeditpass_spinner_categorylist);
+
+		ll_subscrition = (LinearLayout) findViewById(R.id.ll_subscrition);
+		arrallist_category = new ArrayList<HashMap<String, String>>();
+
+		List<String> list = new ArrayList<String>();
+		list.add("Select");
+		list.add("Daily");
+		list.add("Weekly");
+		list.add("Monthly");
+		list.add("Unlimited");
+		list.add("Activation Number");
+
+		// create an ArrayAdaptar from the String Array
+		ArrayAdapter<String> dataAdapter = new ArrayAdapter<String>(this,
+				android.R.layout.simple_spinner_item, list);
+		// set the view for the Drop down list
+		dataAdapter
+				.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		// set the ArrayAdapter to the spinner
+		spinner_activationlimit.setAdapter(dataAdapter);
+
+		cb_promotional
+				.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+
+					@Override
+					public void onCheckedChanged(CompoundButton buttonView,
+							boolean isChecked) {
+						// TODO Auto-generated method stub
+
+						if (isChecked) {
+							ll_subscrition.setVisibility(View.GONE);
+							cb_promotional_check = true;
+						} else {
+							ll_subscrition.setVisibility(View.VISIBLE);
+							cb_promotional_check = false;
+						}
+
+					}
+				});
+
+		cb_monthlyprice
+				.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+
+					@Override
+					public void onCheckedChanged(CompoundButton buttonView,
+							boolean isChecked) {
+						// TODO Auto-generated method stub
+
+						if (isChecked) {
+							cb_monthly_check = true;
+							et_monthly_price.setVisibility(View.VISIBLE);
+
+						} else {
+							cb_monthly_check = false;
+							et_monthly_price.setVisibility(View.GONE);
+						}
+
+					}
+				});
+
+		cb_yearlyprice
+				.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+
+					@Override
+					public void onCheckedChanged(CompoundButton buttonView,
+							boolean isChecked) {
+						// TODO Auto-generated method stub
+						if (isChecked) {
+
+							cb_yearly_check = true;
+							et_yearl_price.setVisibility(View.VISIBLE);
+
+						} else {
+
+							cb_yearly_check = false;
+							et_yearl_price.setVisibility(View.GONE);
+
+						}
+					}
+				});
+
+		spinner_activationlimit
+				.setOnItemSelectedListener(new OnItemSelectedListener() {
+
+					@Override
+					public void onItemSelected(AdapterView<?> arg0, View arg1,
+							int arg2, long arg3) {
+						// TODO Auto-generated method stub
+						if (arg2 == 5) {
+							et_limit_count.setVisibility(View.VISIBLE);
+							et_limit_final_count.setVisibility(View.VISIBLE);
+						} else {
+							et_limit_count.setVisibility(View.GONE);
+							et_limit_final_count.setVisibility(View.GONE);
+						}
+					}
+
+					@Override
+					public void onNothingSelected(AdapterView<?> arg0) {
+						// TODO Auto-generated method stub
+
+					}
+				});
+
+		new GetAllCategory().execute();
+
+		iv_save.setOnClickListener(this);
+		iv_back.setOnClickListener(this);
+		iv_upload.setOnClickListener(this);
+
+		super.onCreate(savedInstanceState);
+
+	}
+
+	@Override
+	public void onClick(View v) {
+		// TODO Auto-generated method stub
+
+		if (v == iv_upload) {
+			selectImage();
+		}
+
+		if (v == cb_promotional) {
+
+			if (cb_promotional.isChecked()) {
+
+			} else {
+
+				if (spinner_activationlimit.getSelectedItemPosition() == 5) {
+
+				}
+
+			}
+
+		}
+
+		if (v == cb_monthlyprice) {
+
+			if (cb_monthlyprice.isChecked()) {
+
+			} else {
+
+			}
+		}
+
+		if (v == cb_yearlyprice) {
+			if (cb_yearlyprice.isChecked()) {
+
+			} else {
+
+			}
+		}
+
+		if (v == iv_back) {
+			finish();
+		}
+		if (v == iv_save) {
+
+			str_title = et_title.getText().toString().trim();
+			str_offerighlight = et_offerhighlight.getText().toString().trim();
+			str_short_desc = et_shortdesc.getText().toString().trim();
+			str_long_desc = et_longdesc.getText().toString().trim();
+
+			if (cb_promotional_check) {
+
+				str_promotional_cb_check = "1";
+
+			} else {
+				str_promotional_cb_check = "0";
+			}
+
+			str_noofpasses_forsale = et_no_of_passes.getText().toString()
+					.trim();
+
+			// str_passimage = et_image.getText().toString().trim();
+
+			if (cb_yearly_check) {
+				str_yeartl_cbcheck = "1";
+				str_yearlyprice = et_yearl_price.getText().toString().trim();
+			} else {
+				str_yeartl_cbcheck = "0";
+				str_yearlyprice = "";
+			}
+
+			if (cb_monthly_check) {
+
+				str_monthly_cbcheck = "1";
+				str_monthlyprice = et_monthly_price.getText().toString().trim();
+
+			} else {
+
+				str_monthly_cbcheck = "0";
+				str_monthlyprice = "";
+			}
+
+			str_activation_limit = spinner_activationlimit.getSelectedItem()
+					.toString();
+
+			if (spinner_activationlimit.getSelectedItemPosition() == 5) {
+				str_limit_count = et_limit_count.getText().toString().trim();
+				str_final_count_extra = et_limit_final_count.getText()
+						.toString().trim();
+			} else {
+				str_limit_count = "";
+				str_final_count_extra = "";
+			}
+
+		}
+
+		new add_editPass().execute();
+
+	}
+
+	public String Add_or_edit_Pass() {
+
+		try {
+			SoapObject request = new SoapObject(NAMESPACE,
+					METHOD_NAME_CHECK_SUBCR);
+
+			JSONObject jObject = new JSONObject();
+
+			jObject.put("szMobileKey", passcode);
+			jObject.put("szTitle", et_title.getText().toString().trim());
+			jObject.put(
+					"idCategory",
+					arrallist_category.get(
+							spinner_categorylist.getSelectedItemPosition())
+							.get("id"));
+
+			jObject.put("idMerchant", sharepref.getString(Url.MerchantId, ""));
+			jObject.put("iPromotional", str_promotional_cb_check);
+			jObject.put("szPeriodMonthly", str_monthly_cbcheck);
+			// jObject.put("merchantImage", str_monthly_cbcheck);
+			//
+
+			jObject.put("szPeriodYearly", str_yeartl_cbcheck);
+
+			jObject.put("fMonthlyPrice", str_monthlyprice);
+			jObject.put("fYearlyPrice", str_yearlyprice);
+
+			jObject.put("iActivationLimit", str_activation_limit);
+			jObject.put("iLimitionsCount", str_limit_count);
+			jObject.put("iCountFinalExpiry", str_final_count_extra);
+
+			jObject.put("iUserLimit", str_noofpasses_forsale);
+			jObject.put("szShortDescription", str_short_desc);
+			jObject.put("szOfferHighlight", str_offerighlight);
+
+			jObject.put("szDescription", str_long_desc);
+			jObject.put("szImage", str_passimage);
+			jObject.put("idPass", str_passid);
+
+			request.addProperty("data", jObject.toString());
+
+			Log.i("addedit request", request.toString());
+
+			SoapSerializationEnvelope envelope = new SoapSerializationEnvelope(
+					SoapEnvelope.VER11);
+			envelope.dotNet = true;
+
+			envelope.setOutputSoapObject(request);
+			HttpTransportSE transportSE = new HttpTransportSE(URL);
+			transportSE.call(SOAP_ACTION_CHECK_SUBCR, envelope);
+			SoapPrimitive response = (SoapPrimitive) envelope.getResponse();
+
+			return response.toString();
+
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		return "";
+	}
+
+	public String GetAllCategory() {
+
+		try {
+			SoapObject request = new SoapObject(NAMESPACE,
+					METHOD_NAME_CHECK_SUBCR_CAREGORY);
+			/*
+			 * JSONObject jObject = new JSONObject();
+			 * 
+			 * 
+			 * request.addProperty("data", jObject.toString());
+			 */
+
+			SoapSerializationEnvelope envelope = new SoapSerializationEnvelope(
+					SoapEnvelope.VER11);
+			envelope.dotNet = true;
+
+			envelope.setOutputSoapObject(request);
+			HttpTransportSE transportSE = new HttpTransportSE(URL);
+			transportSE.call(SOAP_ACTION_CHECK_SUBCR_CATEGORY, envelope);
+			SoapPrimitive response = (SoapPrimitive) envelope.getResponse();
+
+			Log.i("all category", response.toString());
+
+			return response.toString();
+
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		return "";
+	}
+
+	class GetAllCategory extends AsyncTask<Void, Void, Void> {
+
+		String str_response;
+		ProgressDialog pDialog = null;
+
+		@Override
+		protected void onPreExecute() {
+			// TODO Auto-generated method stub
+			pDialog = new ProgressDialog(AddEditPass.this);
+			pDialog.setMessage("Please Wait....");
+			pDialog.show();
+
+			super.onPreExecute();
+		}
+
+		@Override
+		protected Void doInBackground(Void... params) {
+			// TODO Auto-generated method stub
+			str_response = GetAllCategory();
+
+			return null;
+		}
+
+		@Override
+		protected void onPostExecute(Void result) {
+			// TODO Auto-generated method stub
+
+			try {
+				pDialog.dismiss();
+				JSONObject jobj = new JSONObject(str_response);
+				JSONObject json_siteresponse = jobj
+						.getJSONObject("site_response");
+				String responsecheck = json_siteresponse.getString("response");
+
+				if (Url.ResponceCheckError.equalsIgnoreCase(responsecheck)) {
+					// pDialog.dismiss();
+					json_siteresponse = jobj.getJSONObject("site_message");
+					responsecheck = json_siteresponse.getString("message");
+
+					Toast.makeText(AddEditPass.this, responsecheck, 10000)
+							.show();
+
+				} else {
+
+					JSONArray jarray = jobj.getJSONArray("category_list");
+
+					for (int i = 0; i < jarray.length(); i++) {
+
+						JSONObject jobj1 = jarray.getJSONObject(i);
+
+						String id = jobj1.getString("id");
+						String name = jobj1.getString("szName");
+
+						HashMap<String, String> map = new HashMap<String, String>();
+						map.put("id", id);
+						map.put("szName", name);
+
+						arrallist_category.add(map);
+					}
+
+					String[] from = new String[] { "szName" };
+					int[] to = new int[] { android.R.id.text1 };
+
+					SimpleAdapter arrayAdapter;
+
+					arrayAdapter = new SimpleAdapter(AddEditPass.this,
+							arrallist_category,
+							android.R.layout.simple_spinner_item, from, to);
+					arrayAdapter
+							.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+					spinner_categorylist.setAdapter(arrayAdapter);
+
+					Intent i = getIntent();
+					String addedit = i.getStringExtra("addedit");
+					if (addedit.equalsIgnoreCase("add")) {
+
+					} else {
+						str_editpassresponse = i
+								.getStringExtra("stringrespone");
+						new GetSetDetails().execute();
+					}
+
+					spinner_categorylist
+							.setOnItemSelectedListener(new OnItemSelectedListener() {
+
+								@Override
+								public void onItemSelected(AdapterView<?> arg0,
+										View arg1, int arg2, long arg3) {
+									// TODO Auto-generated method stub
+
+									Toast.makeText(
+											AddEditPass.this,
+											arrallist_category.get(arg2).get(
+													"id"), 1000).show();
+
+								}
+
+								@Override
+								public void onNothingSelected(
+										AdapterView<?> arg0) {
+									// TODO Auto-generated method stub
+
+								}
+							});
+
+				}
+
+			} catch (Exception e) {
+				// TODO: handle exception
+			}
+
+			super.onPostExecute(result);
+		}
+	}
+
+	public class add_editPass extends AsyncTask<Void, Void, Void> {
+
+		ProgressDialog pDialog1 = null;
+		String str_add_edit_result;
+
+		@Override
+		protected void onPreExecute() {
+			// TODO Auto-generated method stub
+			pDialog1 = new ProgressDialog(AddEditPass.this);
+			pDialog1.setMessage("Please Wait....");
+			pDialog1.show();
+
+			super.onPreExecute();
+		}
+
+		@Override
+		protected Void doInBackground(Void... params) {
+			// TODO Auto-generated method stub
+			str_add_edit_result = Add_or_edit_Pass();
+			Log.i("addeditrespone", str_add_edit_result);
+			return null;
+		}
+
+		@Override
+		protected void onPostExecute(Void result) {
+			// TODO Auto-generated method stub
+
+			try {
+
+				// {"site_response":{"response":"SUCCESS"},"site_message":{"message":"Successfully Added"}}
+
+				pDialog1.dismiss();
+
+				Log.i("addeditpaasss", str_add_edit_result);
+
+				JSONObject jobj = new JSONObject(str_add_edit_result);
+				JSONObject jobj1 = jobj.getJSONObject("site_response");
+				String respone = jobj1.getString("response");
+
+				if (respone.equalsIgnoreCase(Url.ResponceCheckError)) {
+
+					jobj1 = jobj.getJSONObject("site_message");
+					respone = jobj1.getString("message");
+
+					Toast.makeText(AddEditPass.this, respone, 10000).show();
+				} else {
+					jobj1 = jobj.getJSONObject("site_message");
+					respone = jobj1.getString("message");
+
+					Toast.makeText(AddEditPass.this, respone, 10000).show();
+					finish();
+				}
+
+			} catch (Exception e) {
+				// TODO: handle exception
+				e.printStackTrace();
+			}
+
+			super.onPostExecute(result);
+		}
+	}
+
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+		if (requestCode == REQUEST_CAMERA && resultCode == Activity.RESULT_OK) {
+			// Toast.makeText(getApplicationContext(), "True", 1000).show();
+			Bitmap bm = (Bitmap) data.getExtras().get("data");
+			Bitmap photo = Bitmap.createScaledBitmap(bm, 100, 100, true);
+			Profile_image.setImageBitmap(photo);
+			encodeTobase64(bm);
+
+		} else if (requestCode == SELECT_FILE
+				&& resultCode == Activity.RESULT_OK) {
+			Uri selectedImageUri = data.getData();
+
+			String tempPath = getPath(selectedImageUri, AddEditPass.this);
+
+			Log.e("path of image", tempPath);
+			try {
+				Bitmap bm = null;
+				// decodeFile(tempPath);
+
+				BitmapFactory.Options btmapOptions = new BitmapFactory.Options();
+				bm = BitmapFactory.decodeFile(tempPath, btmapOptions);
+				bm = Bitmap.createScaledBitmap(bm, 100, 100, true);
+
+				Profile_image.setImageBitmap(bm);
+				encodeTobase64(bm);
+			} catch (Exception e) {
+				e.printStackTrace();
+				Toast.makeText(getApplicationContext(),
+						"Problem in changing profile picture",
+						Toast.LENGTH_SHORT).show();
+
+			}
+
+			// Log.i("byte ***",b+"");
+
+		}
+	}
+
+	// decodes image and scales it to reduce memory consumption
+	private Bitmap decodeFile(String f) {
+		try {
+			// Decode image size
+			BitmapFactory.Options o = new BitmapFactory.Options();
+			o.inJustDecodeBounds = true;
+			// BitmapFactory.decodeStream(new FileInputStream(f),null,o);
+			BitmapFactory.decodeFile(f, o);
+
+			// The new size we want to scale to
+			final int REQUIRED_SIZE = 70;
+
+			// Find the correct scale value. It should be the power of 2.
+			int width_tmp = o.outWidth, height_tmp = o.outHeight;
+			int scale = 1;
+			while (true) {
+				if (width_tmp / 2 < REQUIRED_SIZE
+						|| height_tmp / 2 < REQUIRED_SIZE)
+					break;
+
+				width_tmp /= 2;
+				height_tmp /= 2;
+				scale *= 2;
+			}
+
+			// Decode with inSampleSize
+			BitmapFactory.Options o2 = new BitmapFactory.Options();
+			o2.inSampleSize = scale;
+			return BitmapFactory.decodeStream(new FileInputStream(f), null, o2);
+		} catch (FileNotFoundException e) {
+		}
+		return null;
+	}
+
+	public void encodeTobase64(Bitmap image) {
+		Bitmap immagex = image;
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		immagex.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+		byte[] b = baos.toByteArray();
+
+		encoded = Base64.encodeToString(b, Base64.DEFAULT);
+		str_passimage = encoded;
+		// String imageEncoded = Base64.encodeToString(b, Base64.DEFAULT);
+		// Toast.makeText(getApplicationContext(), encoded, 100000).show();
+		// Log.e("LOOK", imageEncoded);
+
+		// return imageEncoded;
+	}
+
+	public String getPath(Uri uri, Activity activity) {
+		String[] projection = { MediaColumns.DATA };
+		Cursor cursor = activity
+				.managedQuery(uri, projection, null, null, null);
+		int column_index = cursor.getColumnIndexOrThrow(MediaColumns.DATA);
+		cursor.moveToFirst();
+		return cursor.getString(column_index);
+	}
+
+	private void selectImage() {
+
+		final CharSequence[] items = { "Take Photo", "Choose from Library",
+				"Cancel" };
+
+		AlertDialog.Builder builder = new AlertDialog.Builder(AddEditPass.this);
+		builder.setTitle("Add Photo!");
+
+		builder.setItems(items, new DialogInterface.OnClickListener() {
+
+			@Override
+			public void onClick(DialogInterface dialog, int item) {
+				if (items[item].equals("Take Photo")) {
+					Intent cameraIntent = new Intent(
+							android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+					startActivityForResult(cameraIntent, REQUEST_CAMERA);
+				} else if (items[item].equals("Choose from Library")) {
+					Intent intent = new Intent(
+							Intent.ACTION_PICK,
+							android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+					intent.setType("image/*");
+					startActivityForResult(
+							Intent.createChooser(intent, "Select File"),
+							SELECT_FILE);
+
+				} else if (items[item].equals("Cancel")) {
+					dialog.dismiss();
+				}
+			}
+		});
+		builder.show();
+
+	}
+
+	public class GetSetDetails extends AsyncTask<Void, Void, Void> {
+
+		String str_monthlyprice, str_yearlyprice, str_imageicon,
+				str_description, str_londesc, str_title, str_titleid,
+				str_merchanname, str_offer, str_userlimit, str_limit_count,
+				str_limit_extracount, str_monthlyperiod_cbn,
+				str_yearlyperiod_cbn, str_promotional_cbn, str_idcategory,
+				str_limitationspinner;
+
+		@Override
+		protected void onPreExecute() {
+			// TODO Auto-generated method stub
+			super.onPreExecute();
+		}
+
+		@Override
+		protected Void doInBackground(Void... params) {
+			// TODO Auto-generated method stub
+
+			return null;
+		}
+
+		@Override
+		protected void onPostExecute(Void result) {
+			// TODO Auto-generated method stub
+
+			try {
+
+				JSONObject jobj = new JSONObject(str_editpassresponse);
+
+				JSONObject jobj1 = jobj.getJSONObject(Url.SITE_RESPONSE);
+
+				String resp = jobj1.getString("response");
+
+				if (resp.equalsIgnoreCase("SUCCESS")) {
+
+					JSONArray jarray = jobj.getJSONArray("pass_detail");
+					jobj = jarray.getJSONObject(0);
+
+					str_titleid = jobj.getString("id");
+
+					str_passid = str_titleid;
+
+					str_idcategory = jobj.getString("idCategory");
+
+					str_title = jobj.getString("szTilte");
+					str_description = jobj.getString("szShortDescription");
+					str_londesc = jobj.getString("szDescription");
+					str_monthlyprice = jobj.getString("fPrice");
+					str_yearlyprice = jobj.getString("fYearlyPrice");
+					str_offer = jobj.getString("szOfferHighlight");
+					str_imageicon = jobj.getString("szUploadImageName");
+					str_userlimit = jobj.getString("iUserLimit");
+					str_limit_count = jobj.getString("iLimitionCount");
+					str_limit_extracount = jobj.getString("iCountFinalExpiry");
+
+					str_monthlyperiod_cbn = jobj.getString("iPeriod");
+					str_yearlyperiod_cbn = jobj.getString("iYearlyPeriod");
+					str_promotional_cbn = jobj.getString("iPromotional");
+					str_limitationspinner = jobj.getString("iLimitions");
+
+					et_title.setText(str_title);
+					et_offerhighlight.setText(str_offer);
+					et_shortdesc.setText(str_description);
+					et_longdesc.setText(str_londesc);
+					et_no_of_passes.setText(str_userlimit);
+					et_monthly_price.setText(str_monthlyprice);
+					et_yearl_price.setText(str_yearlyprice);
+					et_limit_count.setText(str_limit_count);
+					et_limit_final_count.setText(str_limit_extracount);
+
+					int categorypostion = 0;
+					for (int i = 0; i < arrallist_category.size(); i++) {
+						if (arrallist_category.get(i).get("id")
+								.equalsIgnoreCase(str_idcategory)) {
+							categorypostion = i;
+							break;
+						}
+					}
+
+					spinner_categorylist.setSelection(categorypostion);
+
+					if (str_promotional_cbn.equalsIgnoreCase("0")) {
+						cb_promotional.setChecked(false);
+						ll_subscrition.setVisibility(View.VISIBLE);
+					} else {
+						cb_promotional.setChecked(true);
+						ll_subscrition.setVisibility(View.GONE);
+					}
+					if (!str_monthlyperiod_cbn.equalsIgnoreCase("")) {
+						cb_monthlyprice.setChecked(true);
+					}
+					if (!str_yearlyperiod_cbn.equalsIgnoreCase("")) {
+						cb_yearlyprice.setChecked(true);
+					}
+
+					if (str_limitationspinner.equalsIgnoreCase("Daily")) {
+						spinner_activationlimit.setSelection(1);
+
+					} else if (str_limitationspinner.equalsIgnoreCase("Weekly")) {
+						spinner_activationlimit.setSelection(2);
+					} else if (str_limitationspinner
+							.equalsIgnoreCase("Monthly")) {
+						spinner_activationlimit.setSelection(3);
+					} else if (str_limitationspinner
+							.equalsIgnoreCase(" Unlimited")) {
+						spinner_activationlimit.setSelection(4);
+					} else if (str_limitationspinner
+							.equalsIgnoreCase("Activation Number")) {
+						spinner_activationlimit.setSelection(5);
+					}
+
+					imageLoader.DisplayImage(str_imageicon, Profile_image);
+				}
+
+			} catch (Exception e) {
+				// TODO: handle exception
+				e.printStackTrace();
+			}
+
+			super.onPostExecute(result);
+		}
+	}
+}
